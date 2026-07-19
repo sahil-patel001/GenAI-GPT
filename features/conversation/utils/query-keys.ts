@@ -8,5 +8,6 @@ export const queryKeys = {
       byConversation: (conversationId: string) =>
         ["messages", conversationId] as const,
     },
+    usage: ["usage"] as const,
   };
   

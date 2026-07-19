@@ -12,12 +12,19 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
+type ChatComposerUsage = {
+  used: number;
+  limit: number;
+};
+
 type ChatComposerProps = {
   onSend: (content: string) => Promise<void> | void;
   isSending?: boolean;
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  /** Lifetime message quota to display; omit to hide the indicator. */
+  usage?: ChatComposerUsage;
 };
 
 /**
@@ -29,6 +36,7 @@ export function ChatComposer({
   placeholder = "Message ChaiGPT…",
   className,
   autoFocus = false,
+  usage,
 }: ChatComposerProps) {
   const [value, setValue] = React.useState("");
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -39,11 +47,13 @@ export function ChatComposer({
     }
   }, [autoFocus]);
 
+  const quotaExhausted = usage !== undefined && usage.used >= usage.limit;
+
   /** Submits the current message when the form is submitted or Enter is pressed. */
   async function handleSubmit(event?: React.FormEvent) {
     event?.preventDefault();
     const content = value.trim();
-    if (!content || isSending) return;
+    if (!content || isSending || quotaExhausted) return;
 
     setValue("");
     await onSend(content);
@@ -58,7 +68,7 @@ export function ChatComposer({
     }
   }
 
-  const canSend = value.trim().length > 0 && !isSending;
+  const canSend = value.trim().length > 0 && !isSending && !quotaExhausted;
 
   return (
     <form
@@ -71,8 +81,12 @@ export function ChatComposer({
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={isSending}
+          placeholder={
+            quotaExhausted
+              ? "You've used all your free messages"
+              : placeholder
+          }
+          disabled={isSending || quotaExhausted}
           rows={1}
           className="max-h-48 min-h-12 py-3.5 pl-4 text-[15px] leading-relaxed"
         />
@@ -91,6 +105,16 @@ export function ChatComposer({
       </InputGroup>
       <p className="mt-2 text-center text-xs text-muted-foreground">
         ChaiGPT can make mistakes. Check important info.
+        {usage ? (
+          <span
+            className={cn(
+              "ml-2",
+              quotaExhausted && "font-medium text-destructive"
+            )}
+          >
+            {Math.min(usage.used, usage.limit)}/{usage.limit} free messages used
+          </span>
+        ) : null}
       </p>
     </form>
   );

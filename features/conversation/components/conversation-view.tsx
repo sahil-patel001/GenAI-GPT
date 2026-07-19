@@ -7,6 +7,7 @@ import { useChat } from "@ai-sdk/react"
 import type { ChatUIMessage } from '@/features/ai/tools/web-search';
 import React, { useMemo } from 'react'
 import { useConversations } from '../hooks/use-conversation';
+import { useUsage } from '../hooks/use-usage';
 import { queryKeys } from '../utils/query-keys';
 import { toast } from 'sonner';
 import { ChatEmpty } from './chat-empty';
@@ -26,6 +27,7 @@ export const ConversationView = ({ conversationId, initialMessages }: Conversati
 
     const queryClient = useQueryClient();
     const { data: conversations } = useConversations();
+    const { data: usage } = useUsage();
 
     const transport = useMemo(() => new DefaultChatTransport<ChatUIMessage>({
         api: "/api/chat",
@@ -44,9 +46,12 @@ export const ConversationView = ({ conversationId, initialMessages }: Conversati
             void queryClient.invalidateQueries({
                 queryKey: queryKeys.conversations.all,
             });
+            void queryClient.invalidateQueries({ queryKey: queryKeys.usage });
         },
         onError: (error) => {
             toast.error(error.message);
+            // A 429 (quota exhausted) also lands here — refresh the indicator.
+            void queryClient.invalidateQueries({ queryKey: queryKeys.usage });
         },
     })
     const title =
@@ -87,6 +92,11 @@ export const ConversationView = ({ conversationId, initialMessages }: Conversati
                 }}
                 isSending={status !== "ready"}
                 autoFocus
+                usage={
+                    usage && !usage.isUnlimited
+                        ? { used: usage.messagesUsed, limit: usage.messageLimit }
+                        : undefined
+                }
             />
         </div>
     )

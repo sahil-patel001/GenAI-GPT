@@ -80,6 +80,15 @@ export function WebSearchTool({ part }: { part: WebSearchPart }) {
     return null;
   }
 
+  if (part.output.limitReached) {
+    return (
+      <div className="flex w-fit items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        <GlobeIcon className="size-3.5 shrink-0" />
+        <span>Web search limit reached — answered without live results</span>
+      </div>
+    );
+  }
+
   const { query, results } = part.output;
 
   return (

@@ -1,6 +1,8 @@
 import { loadChatMessages, saveChatMessages } from "@/features/ai/actions/chat-store";
-import { chatTools } from "@/features/ai/tools/web-search";
+import { MESSAGE_LIMIT } from "@/features/ai/config/limits";
+import { createChatTools } from "@/features/ai/tools/web-search";
 import { getChatModel } from "@/features/ai/utils/model";
+import { consumeMessageCredit } from "@/features/ai/utils/usage";
 import { requireUser } from "@/features/auth/action/require-user";
 import { prisma } from "@/lib/db";
 import { auth } from "@clerk/nextjs/server";
@@ -42,6 +44,17 @@ export async function POST(req: Request) {
     const messages = alreadySaved ? previousMessages : [...previousMessages, message];
 
     if(!alreadySaved){
+        // Charge the quota before persisting — a blocked message is neither
+        // stored nor answered, so retrying it can't slip past billing.
+        const allowed = await consumeMessageCredit(user);
+
+        if (!allowed) {
+            return new Response(
+                `You've used all ${MESSAGE_LIMIT} free messages. Thanks for trying ChaiGPT!`,
+                { status: 429 }
+            );
+        }
+
         await saveChatMessages(id, [message]);
     }
 
@@ -51,7 +64,7 @@ export async function POST(req: Request) {
             conversation.systemPrompt ??
             `You are ChaiGPT, a helpful assistant. Today's date is ${new Date().toDateString()}. Use the webSearch tool for questions about current events, recent releases, or anything time-sensitive. Web search results are more current than your training data — always trust them over what you remember. Search results may mix old and new information: compare dates carefully and base your answer on the most recent facts. Cite the sources you used in your answer.`,
         messages: await convertToModelMessages(messages, { ignoreIncompleteToolCalls: true }),
-        tools: chatTools,
+        tools: createChatTools(user),
         // Allow tool call → result → follow-up searches → final answer.
         stopWhen: stepCountIs(5),
     });

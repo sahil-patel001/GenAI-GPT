@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "isUnlimited" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "messagesUsed" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "searchesUsed" INTEGER NOT NULL DEFAULT 0;
