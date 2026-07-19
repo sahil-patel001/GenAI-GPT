@@ -1,12 +1,11 @@
 "use client";
 
-import { isTextUIPart, type UIMessage } from "ai";
+import { isTextUIPart } from "ai";
 import type { ChatStatus } from "ai";
 
 import {
   Conversation,
   ConversationContent,
-  ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import {
   Message,
@@ -14,22 +13,38 @@ import {
   MessageResponse,
 } from "@/components/ai-elements/message";
 import { Loader } from "@/components/ai-elements/loader";
-
-/** Extracts plain text from a `UIMessage` by joining all text parts. */
-function getMessageText(message: UIMessage) {
-  return message.parts
-    .filter(isTextUIPart)
-    .map((part) => part.text)
-    .join("");
-}
+import type { ChatUIMessage } from "@/features/ai/tools/web-search";
+import { WebSearchTool } from "./web-search-tool";
 
 type ChatMessagesProps = {
-  messages: UIMessage[];
+  messages: ChatUIMessage[];
   status: ChatStatus;
 };
 
 /**
- * Renders the conversation message list with markdown responses and a loading indicator.
+ * Renders one message part: markdown for text, tool cards for tool invocations.
+ */
+function MessagePart({
+  part,
+  partIndex,
+}: {
+  part: ChatUIMessage["parts"][number];
+  partIndex: number;
+}) {
+  if (isTextUIPart(part)) {
+    return part.text ? <MessageResponse key={partIndex}>{part.text}</MessageResponse> : null;
+  }
+
+  if (part.type === "tool-webSearch") {
+    return <WebSearchTool part={part} />;
+  }
+
+  return null;
+}
+
+/**
+ * Renders the conversation message list with markdown responses, tool
+ * invocation cards, and a loading indicator.
  */
 export function ChatMessages({ messages, status }: ChatMessagesProps) {
   const isWaiting =
@@ -41,7 +56,13 @@ export function ChatMessages({ messages, status }: ChatMessagesProps) {
         {messages.map((message) => (
           <Message key={message.id} from={message.role}>
             <MessageContent>
-              <MessageResponse>{getMessageText(message)}</MessageResponse>
+              {message.parts.map((part, index) => (
+                <MessagePart
+                  key={"toolCallId" in part ? part.toolCallId : `${message.id}-${index}`}
+                  part={part}
+                  partIndex={index}
+                />
+              ))}
             </MessageContent>
           </Message>
         ))}
@@ -54,7 +75,7 @@ export function ChatMessages({ messages, status }: ChatMessagesProps) {
           </Message>
         ) : null}
       </ConversationContent>
-   
+
     </Conversation>
   );
 }

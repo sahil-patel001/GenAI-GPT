@@ -4,6 +4,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useChat } from "@ai-sdk/react"
+import type { ChatUIMessage } from '@/features/ai/tools/web-search';
 import React, { useMemo } from 'react'
 import { useConversations } from '../hooks/use-conversation';
 import { queryKeys } from '../utils/query-keys';
@@ -25,7 +26,7 @@ export const ConversationView = ({ conversationId, initialMessages }: Conversati
     const queryClient = useQueryClient();
     const { data: conversations } = useConversations();
 
-    const transport = useMemo(() => new DefaultChatTransport({
+    const transport = useMemo(() => new DefaultChatTransport<ChatUIMessage>({
         api: "/api/chat",
         prepareSendMessagesRequest: ({ id, messages }) => ({
             body: {
@@ -34,9 +35,9 @@ export const ConversationView = ({ conversationId, initialMessages }: Conversati
         })
     }), []);
 
-    const { messages, sendMessage, status } = useChat({
+    const { messages, sendMessage, status } = useChat<ChatUIMessage>({
         id: conversationId,
-        messages: initialMessages,
+        messages: initialMessages as ChatUIMessage[],
         transport,
         onFinish: () => {
             void queryClient.invalidateQueries({
