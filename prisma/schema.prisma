@@ -37,12 +37,22 @@ model Conversation {
   updatedAt     DateTime @updatedAt
   lastMessageAt DateTime @default(now())
 
+  // Branching: a branch is a full conversation that copied its history from
+  // `parent` up to (and including) the message it was branched from.
+  parentId              String?
+  branchedFromMessageId String?
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // History is copied at branch time, so branches survive parent deletion.
+  parent   Conversation?  @relation("ConversationBranches", fields: [parentId], references: [id], onDelete: SetNull)
+  branches Conversation[] @relation("ConversationBranches")
 
   messages Message[]
 
   @@index([userId, lastMessageAt(sort: Desc)])
   @@index([userId, isPinned, lastMessageAt(sort: Desc)])
+  @@index([parentId])
 }
 
 enum MessageRole {

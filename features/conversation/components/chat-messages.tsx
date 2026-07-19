@@ -2,6 +2,7 @@
 
 import { isTextUIPart } from "ai";
 import type { ChatStatus } from "ai";
+import { GitBranchIcon } from "lucide-react";
 
 import {
   Conversation,
@@ -9,14 +10,19 @@ import {
 } from "@/components/ai-elements/conversation";
 import {
   Message,
+  MessageAction,
+  MessageActions,
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
 import { Loader } from "@/components/ai-elements/loader";
 import type { ChatUIMessage } from "@/features/ai/tools/web-search";
+import { cn } from "@/lib/utils";
+import { useCreateBranch } from "../hooks/use-branch";
 import { WebSearchTool } from "./web-search-tool";
 
 type ChatMessagesProps = {
+  conversationId: string;
   messages: ChatUIMessage[];
   status: ChatStatus;
 };
@@ -24,15 +30,9 @@ type ChatMessagesProps = {
 /**
  * Renders one message part: markdown for text, tool cards for tool invocations.
  */
-function MessagePart({
-  part,
-  partIndex,
-}: {
-  part: ChatUIMessage["parts"][number];
-  partIndex: number;
-}) {
+function MessagePart({ part }: { part: ChatUIMessage["parts"][number] }) {
   if (isTextUIPart(part)) {
-    return part.text ? <MessageResponse key={partIndex}>{part.text}</MessageResponse> : null;
+    return part.text ? <MessageResponse>{part.text}</MessageResponse> : null;
   }
 
   if (part.type === "tool-webSearch") {
@@ -44,11 +44,19 @@ function MessagePart({
 
 /**
  * Renders the conversation message list with markdown responses, tool
- * invocation cards, and a loading indicator.
+ * invocation cards, per-message branch actions, and a loading indicator.
  */
-export function ChatMessages({ messages, status }: ChatMessagesProps) {
-  const isWaiting =
-    status === "submitted" && messages.at(-1)?.role === "user";
+export function ChatMessages({
+  conversationId,
+  messages,
+  status,
+}: ChatMessagesProps) {
+  const createBranch = useCreateBranch();
+
+  const isWaiting = status === "submitted" && messages.at(-1)?.role === "user";
+  // While streaming, the newest messages aren't persisted yet — branching
+  // needs the message to exist in the database.
+  const canBranch = status === "ready" && !createBranch.isPending;
 
   return (
     <Conversation>
@@ -58,12 +66,33 @@ export function ChatMessages({ messages, status }: ChatMessagesProps) {
             <MessageContent>
               {message.parts.map((part, index) => (
                 <MessagePart
-                  key={"toolCallId" in part ? part.toolCallId : `${message.id}-${index}`}
+                  key={
+                    "toolCallId" in part
+                      ? part.toolCallId
+                      : `${message.id}-${index}`
+                  }
                   part={part}
-                  partIndex={index}
                 />
               ))}
             </MessageContent>
+
+            <MessageActions
+              className={cn(
+                "opacity-0 transition-opacity group-hover:opacity-100",
+                message.role === "user" && "justify-end"
+              )}
+            >
+              <MessageAction
+                tooltip="Branch from here"
+                label="Branch from here"
+                disabled={!canBranch}
+                onClick={() =>
+                  createBranch.mutate({ conversationId, messageId: message.id })
+                }
+              >
+                <GitBranchIcon className="size-3.5" />
+              </MessageAction>
+            </MessageActions>
           </Message>
         ))}
 
@@ -75,7 +104,6 @@ export function ChatMessages({ messages, status }: ChatMessagesProps) {
           </Message>
         ) : null}
       </ConversationContent>
-
     </Conversation>
   );
 }

@@ -13,6 +13,10 @@ export type ConversationListItem = {
     lastMessageAt: Date;
     createdAt: Date;
     updatedAt: Date;
+    /** Parent conversation when this chat is a branch. */
+    parentId: string | null;
+    /** Message in the parent this chat was branched from. */
+    branchedFromMessageId: string | null;
 };
 
 
@@ -66,6 +70,8 @@ export async function listConversations(): Promise<ConversationListItem[]> {
             lastMessageAt: true,
             createdAt: true,
             updatedAt: true,
+            parentId: true,
+            branchedFromMessageId: true,
         },
     })
 }

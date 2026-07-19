@@ -1,8 +1,10 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  GitBranchIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PinIcon,
@@ -138,26 +140,54 @@ function ChatList({
     );
   }
 
-  return (
-    <>
-      {conversations.map((conversation) => (
+  // Group branches under their parent; a branch whose parent is missing
+  // (e.g. archived) is shown at the root level.
+  const branchesByParent = new Map<string, Conversation[]>();
+  const roots: Conversation[] = [];
+
+  for (const conversation of conversations) {
+    const hasVisibleParent =
+      conversation.parentId &&
+      conversations.some((item) => item.id === conversation.parentId);
+
+    if (hasVisibleParent) {
+      const group = branchesByParent.get(conversation.parentId!) ?? [];
+      group.push(conversation);
+      branchesByParent.set(conversation.parentId!, group);
+    } else {
+      roots.push(conversation);
+    }
+  }
+
+  /** Renders a conversation followed by its branches, indented one level per depth. */
+  function renderTree(conversation: Conversation, depth: number): React.ReactNode {
+    const branches = branchesByParent.get(conversation.id) ?? [];
+
+    return (
+      <React.Fragment key={conversation.id}>
         <ChatItem
-          key={conversation.id}
           conversation={conversation}
           isActive={activeId === conversation.id}
+          depth={depth}
         />
-      ))}
-    </>
-  );
+        {branches.map((branch) => renderTree(branch, depth + 1))}
+      </React.Fragment>
+    );
+  }
+
+  return <>{roots.map((conversation) => renderTree(conversation, 0))}</>;
 }
 
 /** Single sidebar row for a conversation with rename, pin, and delete actions. */
 function ChatItem({
   conversation,
   isActive,
+  depth = 0,
 }: {
   conversation: Conversation;
   isActive: boolean;
+  /** Nesting level — branches are indented under their parent chat. */
+  depth?: number;
 }) {
   const updateConversation = useUpdateConversation();
   const deleteConversation = useDeleteConversation(
@@ -178,7 +208,11 @@ function ChatItem({
         tooltip={conversation.title}
         render={<Link href={`/c/${conversation.id}`} />}
         className={cn(isActive && "font-medium")}
+        style={depth > 0 ? { paddingLeft: `${8 + depth * 14}px` } : undefined}
       >
+        {depth > 0 ? (
+          <GitBranchIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        ) : null}
         <span className="truncate">{conversation.title}</span>
       </SidebarMenuButton>
 
